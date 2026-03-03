@@ -1,0 +1,41 @@
+{
+  "name": "menfoutistebot",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Bot Discord de la guilde wow Menfoutiste",
+  "main": "src/server.js",
+  "type": "module",
+  "engines": {
+    "node": ">=18.x"
+  },
+  "scripts": {
+    "start": "wrangler dev",
+    "ngrok": "ngrok http 8787",
+    "test": "c8 mocha test",
+    "fix": "eslint --fix '**/*.js'",
+    "lint": "eslint '**/*.js'",
+    "register": "node src/register.js",
+    "publish": "wrangler deploy"
+  },
+  "author": "Metsu <metsu.wow@gmail.com>",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "discord-interactions": "^4.0.0",
+    "itty-router": "^5.0.9"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.1.1",
+    "c8": "^10.1.2",
+    "chai": "^6.2.0",
+    "dotenv": "^17.2.3",
+    "eslint": "^9.1.0",
+    "eslint-config-prettier": "^10.0.2",
+    "eslint-plugin-prettier": "^5.1.3",
+    "globals": "^16.0.0",
+    "mocha": "^11.0.0",
+    "ngrok": "^5.0.0-beta.2",
+    "prettier": "^3.2.5",
+    "sinon": "^21.0.0",
+    "wrangler": "^4.13.2"
+  }
+}
