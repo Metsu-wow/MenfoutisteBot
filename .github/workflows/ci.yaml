@@ -16,5 +16,5 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           postCommands: |
             echo "*** post commands ***"
-            wrangler d1 migrations apply DB
+            wrangler d1 migrations apply DB --remote
             echo "******"
