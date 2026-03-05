@@ -5,6 +5,8 @@ import {
   verifyKey,
 } from 'discord-interactions';
 import { METIERS_COMMAND } from './commands.js';
+import * as Queries from './queries.js';
+import { postMessage, patchMessage } from './api.js';
 import { InteractionResponseFlags, MessageComponentTypes } from 'discord-interactions';
 
 class JsonResponse extends Response {
@@ -50,66 +52,168 @@ router.post('/', async (request, env) => {
     });
   }
 
+  const professions = await Queries.findAllProfesssions();
+
+  let professionButtons = [];
+
+  professions.forEach((p) => {
+    professionButtons.push({
+        type: MessageComponentTypes.BUTTON,
+        label: p.name,
+        custom_id: 'profession_'+p.id,
+        style: 1
+    })
+  });
+
+  let componentProfessions = [
+    {
+        type: MessageComponentTypes.SEPARATOR,
+        divider: true,
+        spacing: 1,
+    },
+    {
+      type: MessageComponentTypes.TEXT_DISPLAY,
+      content: 'Métiers de craft :',
+    },
+    {
+      type: MessageComponentTypes.ACTION_ROW,
+      components: professionButtons.slice(0, 5),
+    },
+    {
+      type: MessageComponentTypes.ACTION_ROW,
+      components: professionButtons.slice(5, 8),
+    },
+    {
+      type: MessageComponentTypes.TEXT_DISPLAY,
+      content: 'Métiers de collecte :',
+    },
+    {
+      type: MessageComponentTypes.ACTION_ROW,
+      components: professionButtons.slice(8, 11),
+    },
+    {
+      type: MessageComponentTypes.TEXT_DISPLAY,
+      content: 'Métiers autres :',
+    },
+    {
+      type: MessageComponentTypes.ACTION_ROW,
+      components: professionButtons.slice(11),
+    }
+  ];
+
   if (interaction.type === InteractionType.APPLICATION_COMMAND) {
     // Most user commands will come as `APPLICATION_COMMAND`.
     switch (interaction.data.name.toLowerCase()) {
-      case METIERS_COMMAND.name.toLowerCase(): {
-        return new JsonResponse({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: {
-            flags: InteractionResponseFlags.IS_COMPONENTS_V2,
-            components: [
-              {
-                type: MessageComponentTypes.TEXT_DISPLAY,
-                content: 'TEST',
-              },
-              {
-                type: MessageComponentTypes.ACTION_ROW,
-                components: [
-                  {
-                    type: MessageComponentTypes.STRING_SELECT,
-                    custom_id: 'metiers_choose',
-                    placeholder: 'Sélectionnez le/les métiers',
-                    options: [
-                      {
-                        label: 'Alchimie',
-                        value: 'alchimie'
-                      },
-                      {
-                        label: 'Calligraphie',
-                        value: 'calligraphie'
-                      },
-                      {
-                        label: 'Dépeçage',
-                        value: 'depecage'
-                      }
-                    ],
-                    min_values: 1,
-                    max_values: 3
-                  },
-                ],
-              },
-            ],
-          },
-        });
-      }
-      default:
-        return new JsonResponse({ error: 'Unknown Type' }, { status: 400 });
+        case METIERS_COMMAND.name.toLowerCase(): {
+            if (interaction.data.options[0].name.toLowerCase() === 'init') {
+                await Queries.deleteAllVersions();
+                console.log(interaction.data.options[0].options[0].value);
+                const container = await listProfessions("patch");
+                const messageId = await postMessage(interaction.channel.id, {
+                    flags: InteractionResponseFlags.IS_COMPONENTS_V2,
+                    components: container
+                });
+                await Queries.createVersion(interaction.data.options[0].options[0].value, interaction.channel.id, messageId)
+            }
+            return new JsonResponse({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: {
+                    flags: InteractionResponseFlags.EPHEMERAL,
+                    content: "Version initialisée avec succès"
+                }
+            });
+        }
+        default:
+            return new JsonResponse({ error: 'Unknown Type' }, { status: 400 });
     }
   }
 
   if (interaction.type === InteractionType.MESSAGE_COMPONENT) {
-    // custom_id set in payload when sending message component
-    const componentId = interaction.data.custom_id;
-    // user who clicked button
-    const userId = request.body.member.user.id;
+    if (interaction.data.custom_id === 'add_profession') {
+        return new JsonResponse({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+                flags: InteractionResponseFlags.IS_COMPONENTS_V2 | InteractionResponseFlags.EPHEMERAL,
+                components: componentProfessions
+            }
+        });
+    }
 
-    if (componentId.startsWith('metiers_choose')) {
-      console.log(request.body);
-      return new JsonResponse({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: { content: `<@${userId}> clicked the button` },
-      });
+    if (interaction.data.custom_id.startsWith('profession_')) {
+        const professionId = interaction.data.custom_id.split('_')[1];
+        console.log(professionId);
+
+        const specializations = await Queries.findAllSpecializationsByProfessionId(professionId);
+        console.log(specializations)
+
+        let specializationOptions = [];
+
+        specializations.forEach((s) => {
+            specializationOptions.push(
+                {
+                  label: s.name,
+                  value: s.id
+                }
+            );
+        });
+
+        return new JsonResponse({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+                flags: InteractionResponseFlags.IS_COMPONENTS_V2 | InteractionResponseFlags.EPHEMERAL,
+                components: [
+                    {
+                      type: MessageComponentTypes.TEXT_DISPLAY,
+                      content: 'Choisissez les spécialisations du métier : ',
+                    },
+                    {
+                      type: MessageComponentTypes.ACTION_ROW,
+                      components: [
+                        {
+                          type: MessageComponentTypes.STRING_SELECT,
+                          custom_id: 'specialization_'+professionId,
+                          placeholder: 'Sélectionnez le/les spécialisations',
+                          options: specializationOptions,
+                          min_values: 1,
+                          max_values: specializationOptions.length
+                        },
+                      ],
+                    },
+                ],
+            }
+        });
+    }
+
+    if (interaction.data.custom_id.startsWith('specialization_')) {
+        const resultsUser = await Queries.findUserByDiscordId(interaction.member.user.id);
+        let userId;
+        if (resultsUser.length == 0) {
+            userId = await Queries.createUser(interaction.member.user.id, interaction.member.user.global_name);
+        } else {
+            userId = resultsUser[0].id;
+        }
+
+
+        const professionId = interaction.data.custom_id.split('_')[1];
+        const version = await Queries.findLastVersion(interaction.channel.id);
+
+        await Queries.deleteProfessionAndSpecializationFromUser(userId, professionId, version.id);
+        await Promise.all(interaction.data.values.map(async (v) => {
+            await Queries.addProfessionAndSpecializationToUser(userId, professionId, parseInt(v), version.id);
+        }));
+        const container = await listProfessions(version.id);
+        const messageId = await patchMessage(interaction.channel.id, version.discord_message_id, {
+            flags: InteractionResponseFlags.IS_COMPONENTS_V2,
+            components: container
+        });
+
+        return new JsonResponse({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+                flags: InteractionResponseFlags.EPHEMERAL,
+                content: "Métier mis à jour"
+            }
+        });
     }
   }
 
@@ -139,3 +243,54 @@ const server = {
 };
 
 export default server;
+
+async function listProfessions(versionId) {
+    const professions = await Queries.findAllProfesssions();
+    const liste = await Queries.findProfessionsAndSpecializationsByUsersByVersion(versionId);
+    let content = "";
+
+    professions.forEach((p) => {
+        content += "### " + p.name + "\n";
+        const byProfession = liste.filter(l => l.profession_id == p.id);
+        const groupedByUser = byProfession.reduce((group, user) => {
+            const { user_discord_id } = user;
+            
+            // Initialize the group if it doesn't exist
+            if (!group[user_discord_id]) {
+                group[user_discord_id] = [];
+            }
+            
+            // Add the user to the corresponding age group
+            group[user_discord_id].push(user.specialization_name);
+            return group;
+        }, {});
+
+        for (const [key, value] of Object.entries(groupedByUser)) {
+            content += `<@${key}>` + " " + "(" + value.join(', ') + ")\n";
+        }
+    });
+
+    return [
+        {
+            type: MessageComponentTypes.CONTAINER,
+            accent_color: 703487,
+            components: [
+                {
+                    type: MessageComponentTypes.TEXT_DISPLAY,
+                    content: "# Liste des artisans Menfoutistes\n" + content
+                },
+            ]
+        },
+        {
+            type: MessageComponentTypes.ACTION_ROW,
+            components: [
+                {
+                    type: MessageComponentTypes.BUTTON,
+                    label: 'Ajouter',
+                    custom_id: 'add_profession',
+                    style: 1
+                }
+            ]
+        },
+    ];
+}

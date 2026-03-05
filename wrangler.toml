@@ -6,3 +6,8 @@ compatibility_date="2026-03-03"
 # DISCORD_TOKEN
 # DISCORD_PUBLIC_KEY
 # DISCORD_APPLICATION_ID
+
+[[d1_databases]]
+binding = "DB"
+database_name = "menfoutistebot-db"
+database_id = "c02e60a7-422f-4fb4-b13c-457fd4790642"
