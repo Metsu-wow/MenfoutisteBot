@@ -61,6 +61,10 @@ router.post('/', async (request, env) => {
         type: MessageComponentTypes.BUTTON,
         label: p.name,
         custom_id: 'profession_'+p.id,
+        emoji: {
+          id: null,
+          name: p.emoji
+        },
         style: 1
     })
   });
@@ -106,7 +110,6 @@ router.post('/', async (request, env) => {
     switch (interaction.data.name.toLowerCase()) {
         case METIERS_COMMAND.name.toLowerCase(): {
             if (interaction.data.options[0].name.toLowerCase() === 'init') {
-                await Queries.deleteAllVersions();
                 console.log(interaction.data.options[0].options[0].value);
                 const container = await listProfessions("patch");
                 const messageId = await postMessage(interaction.channel.id, {
@@ -250,20 +253,22 @@ async function listProfessions(versionId) {
     let content = "";
 
     professions.forEach((p) => {
-        content += "### " + p.name + "\n";
         const byProfession = liste.filter(l => l.profession_id == p.id);
+        let count = 0;
         const groupedByUser = byProfession.reduce((group, user) => {
             const { user_discord_id } = user;
             
             // Initialize the group if it doesn't exist
             if (!group[user_discord_id]) {
                 group[user_discord_id] = [];
+                count += 1;
             }
-            
-            // Add the user to the corresponding age group
+ 
             group[user_discord_id].push(user.specialization_name);
             return group;
         }, {});
+
+        content += "### " + p.emoji + " " + p.name + " (" + count + ")" + "\n";
 
         for (const [key, value] of Object.entries(groupedByUser)) {
             content += `<@${key}>` + " " + "(" + value.join(', ') + ")\n";
