@@ -51,4 +51,4 @@ INSERT INTO specializations (profession_id, name) VALUES
 INSERT INTO specializations (profession_id, name) VALUES
 (6, 'Analyse des combats'),
 (6, 'Mobilité de marché'),
-(6, 'Pièces et robots'),
+(6, 'Pièces et robots');
