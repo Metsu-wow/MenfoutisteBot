@@ -14,3 +14,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          postCommands: |
+            echo "*** post commands ***"
+            wrangler d1 migrations apply DB
+            echo "******"
